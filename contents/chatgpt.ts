@@ -153,8 +153,8 @@ async function enhancePrompt() {
   console.log("📝 Current prompt value:", currentValue)
   
   if (!currentValue || !currentValue.trim()) {
-    console.log("❌ No prompt entered")
-    alert("Please enter a prompt first")
+    console.log("📝 No prompt entered, showing input modal")
+    showPromptInputModal(inputElement)
     return
   }
 
@@ -282,6 +282,12 @@ function updateButton() {
     button.style.backgroundSize = '200% 200%'
     button.style.animation = 'gradientShift 3s ease infinite'
     
+    // Ensure button stays in correct position during loading
+    button.style.position = 'fixed'
+    button.style.bottom = '24px'
+    button.style.right = '24px'
+    button.style.zIndex = '10000'
+    
     // Add enhanced loading animations
     const enhancedLoadingStyle = document.createElement('style')
     enhancedLoadingStyle.innerHTML = `
@@ -312,6 +318,12 @@ function updateButton() {
     button.style.background = theme.accent
     button.style.animation = 'none'
     button.style.backgroundSize = '100% 100%'
+    
+    // Ensure button stays in correct position
+    button.style.position = 'fixed'
+    button.style.bottom = '24px'
+    button.style.right = '24px'
+    button.style.zIndex = '10000'
   }
 }
 
@@ -447,6 +459,275 @@ function createButton() {
   document.head.appendChild(style)
   
   document.body.appendChild(button)
+}
+
+function showPromptInputModal(inputElement: HTMLElement) {
+  console.log("🚀 showPromptInputModal() called")
+  
+  // Remove existing modal
+  const existingModal = document.getElementById('prompt-input-modal')
+  if (existingModal) {
+    existingModal.remove()
+    console.log("🗑️ Removed existing prompt input modal")
+  }
+
+  const theme = detectTheme()
+  console.log("🎨 Theme for input modal:", theme)
+  
+  const modal = document.createElement('div')
+  modal.id = 'prompt-input-modal'
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${theme.background};
+    backdrop-filter: ${theme.blur};
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    opacity: 0;
+    animation: fadeIn 0.3s ease-out forwards;
+  `
+
+  modal.innerHTML = `
+    <div style="
+      background: ${theme.surface};
+      backdrop-filter: ${theme.blur};
+      border: 1px solid ${theme.border};
+      border-radius: 20px;
+      max-width: 600px;
+      width: 90vw;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: ${theme.shadow};
+      animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    ">
+      <div style="padding: 32px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: ${theme.accent};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+          ">✨</div>
+          <h2 style="margin: 0; color: ${theme.text}; font-size: 24px; font-weight: 700;">
+            Enter Your Prompt
+          </h2>
+        </div>
+        
+        <p style="color: ${theme.textSecondary}; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+          Enter the prompt you'd like to enhance. I'll analyze it and provide an improved version with better clarity and specificity.
+        </p>
+        
+        <textarea 
+          id="prompt-input-textarea" 
+          placeholder="Type your prompt here..." 
+          style="
+            width: 100%;
+            min-height: 140px;
+            border: 1px solid ${theme.border};
+            border-radius: 12px;
+            padding: 16px;
+            background: ${theme.surfaceSecondary};
+            color: ${theme.text};
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+            box-sizing: border-box;
+          "
+        ></textarea>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 24px; margin-top: 24px; border-top: 1px solid ${theme.border};">
+          <button id="cancel-input" style="
+            padding: 12px 24px;
+            border: 1px solid ${theme.border};
+            border-radius: 12px;
+            background: ${theme.surface};
+            color: ${theme.textSecondary};
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+          ">
+            <span style='position: relative; z-index: 2; display: flex; align-items: center; gap: 6px;'>
+              <span style='font-size: 12px; transition: transform 0.2s ease;'>❌</span>
+              Cancel
+            </span>
+          </button>
+          <button id="enhance-input" style="
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            background: ${theme.accent};
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+          ">
+            <span style='position: relative; z-index: 2; display: flex; align-items: center; gap: 8px;'>
+              <span style='font-size: 14px; transition: transform 0.2s ease;'>🚀</span>
+              Enhance This Prompt
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+
+  // Add required CSS animations for this modal
+  const inputModalStyle = document.createElement('style')
+  inputModalStyle.innerHTML = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+  `
+  document.head.appendChild(inputModalStyle)
+
+  document.body.appendChild(modal)
+  console.log("✅ Prompt input modal added to DOM")
+  console.log("📍 Modal element:", modal)
+  console.log("🔍 Modal in document:", document.getElementById('prompt-input-modal'))
+  
+  // Focus the textarea
+  setTimeout(() => {
+    const textarea = document.getElementById('prompt-input-textarea') as HTMLTextAreaElement
+    if (textarea) {
+      textarea.focus()
+      console.log("🎯 Textarea focused")
+    } else {
+      console.error("❌ Textarea not found for focus")
+    }
+  }, 400)
+
+  // Add event listeners
+  const cancelButton = document.getElementById('cancel-input')
+  const enhanceButton = document.getElementById('enhance-input')
+  const textarea = document.getElementById('prompt-input-textarea') as HTMLTextAreaElement
+
+  // Textarea focus effects
+  if (textarea) {
+    textarea.addEventListener('focus', () => {
+      textarea.style.borderColor = theme.borderFocus
+      textarea.style.boxShadow = `0 0 0 3px ${theme.borderFocus.replace('0.5)', '0.1)')}`
+    })
+    
+    textarea.addEventListener('blur', () => {
+      textarea.style.borderColor = theme.border
+      textarea.style.boxShadow = 'none'
+    })
+
+    // Auto-resize textarea
+    textarea.addEventListener('input', () => {
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.max(140, textarea.scrollHeight) + 'px'
+    })
+  }
+
+  // Cancel button
+  if (cancelButton) {
+    cancelButton.addEventListener('mouseenter', () => {
+      cancelButton.style.background = theme.surfaceSecondary
+      cancelButton.style.color = theme.text
+      cancelButton.style.transform = 'translateY(-2px) scale(1.02)'
+      cancelButton.style.borderColor = theme.borderFocus
+    })
+    
+    cancelButton.addEventListener('mouseleave', () => {
+      cancelButton.style.background = theme.surface
+      cancelButton.style.color = theme.textSecondary
+      cancelButton.style.transform = 'translateY(0) scale(1)'
+      cancelButton.style.borderColor = theme.border
+    })
+    
+    cancelButton.addEventListener('click', () => {
+      modal.style.animation = 'fadeOut 0.2s ease-in forwards'
+      setTimeout(() => modal.remove(), 200)
+    })
+  }
+
+  // Enhance button
+  if (enhanceButton && textarea) {
+    enhanceButton.addEventListener('mouseenter', () => {
+      enhanceButton.style.background = theme.accentHover
+      enhanceButton.style.transform = 'translateY(-2px) scale(1.05)'
+      enhanceButton.style.boxShadow = '0 12px 24px rgba(102, 126, 234, 0.5)'
+    })
+    
+    enhanceButton.addEventListener('mouseleave', () => {
+      enhanceButton.style.background = theme.accent
+      enhanceButton.style.transform = 'translateY(0) scale(1)'
+      enhanceButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+    })
+    
+    enhanceButton.addEventListener('click', () => {
+      const prompt = textarea.value.trim()
+      if (prompt) {
+        // Set the prompt in the original input field
+        setInputValue(inputElement, prompt)
+        
+        // Close this modal
+        modal.style.animation = 'fadeOut 0.2s ease-in forwards'
+        setTimeout(() => {
+          modal.remove()
+          // Start the enhancement process
+          enhancePrompt()
+        }, 200)
+      } else {
+        // Highlight the textarea if empty
+        textarea.style.borderColor = '#ef4444'
+        textarea.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)'
+        textarea.focus()
+        
+        setTimeout(() => {
+          textarea.style.borderColor = theme.border
+          textarea.style.boxShadow = 'none'
+        }, 2000)
+      }
+    })
+  }
+
+  // Close modal when clicking backdrop
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.style.animation = 'fadeOut 0.2s ease-in forwards'
+      setTimeout(() => modal.remove(), 200)
+    }
+  })
 }
 
 // Streaming text animation function
