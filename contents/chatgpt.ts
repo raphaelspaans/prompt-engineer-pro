@@ -61,29 +61,58 @@ const themes = {
 }
 
 function detectTheme(): Theme {
-  // Check system preference
+  // More comprehensive ChatGPT theme detection
+  const htmlElement = document.documentElement
+  const bodyElement = document.body
+  const bodyClasses = bodyElement.className
+  const htmlClasses = htmlElement.className
+  const computedStyle = window.getComputedStyle(bodyElement)
+  const backgroundColor = computedStyle.backgroundColor
+  const htmlBgColor = window.getComputedStyle(htmlElement).backgroundColor
+  
+  // Check system preference as fallback
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   
-  // Try to detect ChatGPT theme
-  const htmlElement = document.documentElement
-  const bodyClasses = document.body.className
-  const computedStyle = window.getComputedStyle(document.body)
-  const backgroundColor = computedStyle.backgroundColor
+  // More sophisticated ChatGPT-specific theme detection
+  let isDarkMode = false
   
-  // Check for dark theme indicators
-  const isDarkMode = 
-    prefersDark ||
-    bodyClasses.includes('dark') ||
-    htmlElement.classList.contains('dark') ||
-    backgroundColor.includes('rgb(0') || // Very dark backgrounds
-    backgroundColor.includes('rgb(1') ||
-    backgroundColor.includes('rgb(2')
+  // Priority 1: Check explicit dark/light classes on html or body
+  if (htmlClasses.includes('dark') || bodyClasses.includes('dark')) {
+    isDarkMode = true
+  } else if (htmlClasses.includes('light') || bodyClasses.includes('light')) {
+    isDarkMode = false
+  }
+  // Priority 2: Check CSS custom properties for theme
+  else if (getComputedStyle(htmlElement).getPropertyValue('--theme-mode') === 'dark') {
+    isDarkMode = true
+  }
+  // Priority 3: Check background colors more precisely
+  else {
+    const bgRgb = backgroundColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+    const htmlBgRgb = htmlBgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+    
+    if (bgRgb) {
+      const [, r, g, b] = bgRgb.map(Number)
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000
+      isDarkMode = brightness < 128 // Dark if brightness is less than 50%
+    } else if (htmlBgRgb) {
+      const [, r, g, b] = htmlBgRgb.map(Number)
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000
+      isDarkMode = brightness < 128
+    }
+    // Priority 4: System preference as last resort
+    else {
+      isDarkMode = prefersDark
+    }
+  }
   
-  console.log('🎨 Theme detection:', { 
-    prefersDark, 
-    bodyClasses, 
-    backgroundColor, 
-    isDarkMode 
+  console.log('🎨 Enhanced theme detection:', { 
+    htmlClasses,
+    bodyClasses,
+    backgroundColor,
+    htmlBgColor,
+    prefersDark,
+    detectedMode: isDarkMode ? 'dark' : 'light'
   })
   
   return isDarkMode ? themes.dark : themes.light
@@ -142,6 +171,13 @@ async function enhancePrompt() {
     return
   }
   
+  // Check if we're already in a modal flow
+  const existingModal = document.getElementById('prompt-input-modal')
+  if (existingModal) {
+    console.log("⚠️ Input modal already open, skipping direct enhancement")
+    return
+  }
+  
   const inputElement = findChatInput()
   if (!inputElement) {
     console.log("❌ No input element found")
@@ -150,10 +186,10 @@ async function enhancePrompt() {
   }
 
   const currentValue = getInputValue(inputElement)
-  console.log("📝 Current prompt value:", currentValue)
+  console.log("✏️ Current prompt value:", currentValue)
   
   if (!currentValue || !currentValue.trim()) {
-    console.log("📝 No prompt entered, showing input modal")
+    console.log("✏️ No prompt entered, showing input modal")
     showPromptInputModal(inputElement)
     return
   }
@@ -245,11 +281,52 @@ async function enhancePrompt() {
   }
 }
 
+function lockButtonPosition(button: HTMLElement) {
+  // Force absolute positioning lock - this should never be overridden
+  button.style.setProperty('position', 'fixed', 'important')
+  button.style.setProperty('bottom', '24px', 'important')
+  button.style.setProperty('right', '24px', 'important')
+  button.style.setProperty('z-index', '10000', 'important')
+  button.style.setProperty('top', 'auto', 'important')
+  button.style.setProperty('left', 'auto', 'important')
+  
+  // Set up mutation observer to watch for position changes
+  if (!button.dataset.positionLocked) {
+    button.dataset.positionLocked = 'true'
+    
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+          const currentStyle = button.getAttribute('style') || ''
+          
+          // Check if position got reset
+          if (!currentStyle.includes('position: fixed !important') ||
+              !currentStyle.includes('bottom: 24px !important') ||
+              !currentStyle.includes('right: 24px !important')) {
+            console.log("⚠️ Button position was modified, restoring...")
+            lockButtonPosition(button)
+          }
+        }
+      })
+    })
+    
+    observer.observe(button, {
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    })
+    
+    console.log("🔐 Button position observer installed")
+  }
+}
+
 function updateButton() {
   const button = document.getElementById('prompt-enhancer-button')
   if (!button) return
   
   const theme = detectTheme()
+  
+  // ALWAYS lock position first, regardless of state
+  lockButtonPosition(button)
   
   if (isEnhancing) {
     button.innerHTML = `
@@ -282,12 +359,6 @@ function updateButton() {
     button.style.backgroundSize = '200% 200%'
     button.style.animation = 'gradientShift 3s ease infinite'
     
-    // Ensure button stays in correct position during loading
-    button.style.position = 'fixed'
-    button.style.bottom = '24px'
-    button.style.right = '24px'
-    button.style.zIndex = '10000'
-    
     // Add enhanced loading animations
     const enhancedLoadingStyle = document.createElement('style')
     enhancedLoadingStyle.innerHTML = `
@@ -318,13 +389,10 @@ function updateButton() {
     button.style.background = theme.accent
     button.style.animation = 'none'
     button.style.backgroundSize = '100% 100%'
-    
-    // Ensure button stays in correct position
-    button.style.position = 'fixed'
-    button.style.bottom = '24px'
-    button.style.right = '24px'
-    button.style.zIndex = '10000'
   }
+  
+  // Lock position again after any style changes
+  lockButtonPosition(button)
 }
 
 function createButton() {
@@ -347,10 +415,6 @@ function createButton() {
   `
   
   button.style.cssText = `
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 10000;
     background: ${theme.accent};
     color: white;
     border: none;
@@ -367,6 +431,9 @@ function createButton() {
     user-select: none;
     border: 1px solid rgba(255, 255, 255, 0.1);
   `
+  
+  // Use the dedicated positioning function
+  lockButtonPosition(button)
   
   // Add enhanced hover effects with micro-interactions
   button.addEventListener('mouseenter', () => {
@@ -583,7 +650,7 @@ function showPromptInputModal(inputElement: HTMLElement) {
             overflow: hidden;
           ">
             <span style='position: relative; z-index: 2; display: flex; align-items: center; gap: 8px;'>
-              <span style='font-size: 14px; transition: transform 0.2s ease;'>🚀</span>
+              <span style='font-size: 14px; transition: transform 0.2s ease;'>⭐</span>
               Enhance This Prompt
             </span>
           </button>
@@ -676,7 +743,15 @@ function showPromptInputModal(inputElement: HTMLElement) {
     
     cancelButton.addEventListener('click', () => {
       modal.style.animation = 'fadeOut 0.2s ease-in forwards'
-      setTimeout(() => modal.remove(), 200)
+      setTimeout(() => {
+        modal.remove()
+        // Ensure button position is locked after input modal close
+        const button = document.getElementById('prompt-enhancer-button')
+        if (button) {
+          lockButtonPosition(button)
+          console.log("🔧 Button position locked after input modal close")
+        }
+      }, 200)
     })
   }
 
@@ -694,19 +769,85 @@ function showPromptInputModal(inputElement: HTMLElement) {
       enhanceButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
     })
     
-    enhanceButton.addEventListener('click', () => {
+    enhanceButton.addEventListener('click', async () => {
       const prompt = textarea.value.trim()
       if (prompt) {
         // Set the prompt in the original input field
         setInputValue(inputElement, prompt)
         
-        // Close this modal
-        modal.style.animation = 'fadeOut 0.2s ease-in forwards'
-        setTimeout(() => {
-          modal.remove()
-          // Start the enhancement process
-          enhancePrompt()
-        }, 200)
+        // Transform this modal into enhancement loading state
+        originalPrompt = prompt
+        isEnhancing = true
+        updateButton()
+        
+        // Transform the modal content to show loading state
+        transformModalToEnhancement(modal, prompt)
+        
+        try {
+          // Start the enhancement process directly here
+          console.log("📤 Sending message to background script...")
+          
+          const message = { name: 'enhance', body: { prompt: prompt } }
+          console.log("📋 Message to send:", message)
+          
+          const response = await new Promise<any>((resolve, reject) => {
+            console.log("📞 Calling chrome.runtime.sendMessage directly...")
+            
+            if (typeof chrome === 'undefined' || !chrome.runtime) {
+              console.error("❌ Chrome runtime not available")
+              reject(new Error("Chrome extension runtime not available"))
+              return
+            }
+            
+            chrome.runtime.sendMessage(message, (response) => {
+              console.log("📥 Direct response from background:", response)
+              console.log("🔍 Chrome runtime last error:", chrome.runtime.lastError)
+              
+              if (chrome.runtime.lastError) {
+                console.error("❌ Chrome runtime error:", chrome.runtime.lastError.message)
+                reject(new Error(chrome.runtime.lastError.message))
+              } else if (!response) {
+                console.error("❌ No response received from background")
+                reject(new Error("No response from background script"))
+              } else {
+                console.log("✅ Valid response received:", response)
+                resolve(response)
+              }
+            })
+            
+            // Timeout after 30 seconds
+            setTimeout(() => {
+              reject(new Error('Background response timeout'))
+            }, 30000)
+          })
+          
+          console.log("🎯 Processing response:", response)
+          
+          if (!response.enhancedPrompt) {
+            throw new Error("Invalid response: no enhanced prompt received")
+          }
+          
+          enhancedPrompt = response.enhancedPrompt
+          improvements = response.improvements || []
+          
+          console.log("✅ Enhancement complete:", {
+            originalLength: originalPrompt.length,
+            enhancedLength: enhancedPrompt.length,
+            improvementsCount: improvements.length
+          })
+          
+          // Transform modal to show enhancement results
+          transformModalToResults(modal)
+          
+        } catch (error) {
+          console.error("❌ Enhancement failed:", error)
+          
+          // Show error in the modal
+          showErrorInModal(modal, error.message)
+        } finally {
+          isEnhancing = false
+          updateButton()
+        }
       } else {
         // Highlight the textarea if empty
         textarea.style.borderColor = '#ef4444'
@@ -725,9 +866,484 @@ function showPromptInputModal(inputElement: HTMLElement) {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.style.animation = 'fadeOut 0.2s ease-in forwards'
-      setTimeout(() => modal.remove(), 200)
+      setTimeout(() => {
+        modal.remove()
+        // Ensure button position is locked after backdrop close
+        const button = document.getElementById('prompt-enhancer-button')
+        if (button) {
+          lockButtonPosition(button)
+          console.log("🔧 Button position locked after input modal backdrop close")
+        }
+      }, 200)
     }
   })
+}
+
+function transformModalToEnhancement(modal: HTMLElement, prompt: string) {
+  const theme = detectTheme()
+  console.log("🔄 Transforming modal to enhancement loading state")
+  
+  modal.innerHTML = `
+    <div style="
+      background: ${theme.surface};
+      backdrop-filter: ${theme.blur};
+      border: 1px solid ${theme.border};
+      border-radius: 20px;
+      max-width: 920px;
+      width: 90vw;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: ${theme.shadow};
+      transition: all 0.3s ease;
+    ">
+      <div style="padding: 32px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 28px;">
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: ${theme.accent};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+          ">✨</div>
+          <h2 style="margin: 0; color: ${theme.text}; font-size: 24px; font-weight: 700;">
+            Enhancing Your Prompt
+          </h2>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span style="font-size: 16px;">✏️</span>
+              <h3 style="margin: 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">Your Prompt</h3>
+            </div>
+            <div style="
+              border: 1px solid ${theme.border};
+              border-radius: 12px;
+              padding: 16px;
+              background: ${theme.surfaceSecondary};
+              min-height: 140px;
+              font-size: 14px;
+              line-height: 1.6;
+              color: ${theme.text};
+              overflow-y: auto;
+              max-height: 200px;
+            ">
+              ${prompt}
+            </div>
+          </div>
+          
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span style="font-size: 16px;">⭐</span>
+              <h3 style="margin: 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">Enhanced Prompt</h3>
+            </div>
+            <div style="
+              border: 1px solid ${theme.borderFocus};
+              border-radius: 12px;
+              padding: 16px;
+              background: ${theme.surfaceSecondary};
+              min-height: 140px;
+              font-size: 14px;
+              line-height: 1.6;
+              color: ${theme.text};
+              overflow-y: auto;
+              max-height: 200px;
+              position: relative;
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+            ">
+              <div style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                color: ${theme.textSecondary};
+                font-size: 13px;
+              ">
+                <div style="
+                  width: 24px;
+                  height: 24px;
+                  background: linear-gradient(135deg, ${theme.accent.includes('linear') ? '#8b5cf6, #ec4899' : theme.accent + ', #10b981'});
+                  border-radius: 6px;
+                  animation: pulse 2s infinite;
+                  position: relative;
+                  overflow: hidden;
+                ">
+                  <div style="
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                    animation: shimmer 2s infinite;
+                  "></div>
+                </div>
+                <span style="
+                  background: linear-gradient(90deg, ${theme.textSecondary} 25%, ${theme.text} 50%, ${theme.textSecondary} 75%);
+                  background-size: 200% 100%;
+                  animation: textShimmer 2s infinite;
+                  -webkit-background-clip: text;
+                  background-clip: text;
+                  -webkit-text-fill-color: transparent;
+                ">Analyzing and enhancing your prompt...</span>
+              </div>
+              
+              <!-- Loading skeleton for text content -->
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="
+                  height: 12px;
+                  background: linear-gradient(90deg, ${theme.surfaceSecondary} 25%, rgba(255,255,255,0.1) 50%, ${theme.surfaceSecondary} 75%);
+                  background-size: 200% 100%;
+                  animation: shimmer 1.5s infinite;
+                  border-radius: 6px;
+                  width: 90%;
+                "></div>
+                <div style="
+                  height: 12px;
+                  background: linear-gradient(90deg, ${theme.surfaceSecondary} 25%, rgba(255,255,255,0.1) 50%, ${theme.surfaceSecondary} 75%);
+                  background-size: 200% 100%;
+                  animation: shimmer 1.5s infinite 0.2s;
+                  border-radius: 6px;
+                  width: 70%;
+                "></div>
+                <div style="
+                  height: 12px;
+                  background: linear-gradient(90deg, ${theme.surfaceSecondary} 25%, rgba(255,255,255,0.1) 50%, ${theme.surfaceSecondary} 75%);
+                  background-size: 200% 100%;
+                  animation: shimmer 1.5s infinite 0.4s;
+                  border-radius: 6px;
+                  width: 85%;
+                "></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center; padding-top: 20px; border-top: 1px solid ${theme.border};">
+          <div style="
+            color: ${theme.textSecondary};
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          ">
+            <div style="
+              width: 16px;
+              height: 16px;
+              border: 2px solid ${theme.textSecondary};
+              border-top: 2px solid ${theme.accent.includes('linear') ? '#8b5cf6' : theme.accent};
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+            "></div>
+            Please wait while I enhance your prompt...
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+function transformModalToResults(modal: HTMLElement) {
+  const theme = detectTheme()
+  console.log("🎉 Transforming modal to results state")
+  
+  // Add required CSS animations for typewriter effect
+  const transformStyle = document.createElement('style')
+  transformStyle.innerHTML = `
+    @keyframes fadeInChar {
+      from { 
+        opacity: 0; 
+        transform: translateY(5px);
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+  `
+  document.head.appendChild(transformStyle)
+  
+  const improvementsHtml = improvements.length > 0 ? `
+    <div style="margin-bottom: 24px;">
+      <h3 style="margin: 0 0 12px 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">✨ Improvements Made</h3>
+      <ul style="margin: 0; padding-left: 20px; color: ${theme.text}; font-size: 14px; line-height: 1.6;">
+        ${improvements.map(imp => `
+          <li style="margin-bottom: 8px; position: relative;">
+            <span style="color: ${theme.accent.includes('linear') ? '#8b5cf6' : theme.accent};">•</span>
+            <span style="margin-left: 8px;">${imp}</span>
+          </li>
+        `).join('')}
+      </ul>
+    </div>
+  ` : ''
+
+  modal.innerHTML = `
+    <div style="
+      background: ${theme.surface};
+      backdrop-filter: ${theme.blur};
+      border: 1px solid ${theme.border};
+      border-radius: 20px;
+      max-width: 920px;
+      width: 90vw;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: ${theme.shadow};
+      transition: all 0.3s ease;
+    ">
+      <div style="padding: 32px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 28px;">
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: ${theme.accent};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+          ">✨</div>
+          <h2 style="margin: 0; color: ${theme.text}; font-size: 24px; font-weight: 700;">
+            Prompt Enhancement Complete
+          </h2>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span style="font-size: 16px;">✏️</span>
+              <h3 style="margin: 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">Original Prompt</h3>
+            </div>
+            <div style="
+              border: 1px solid ${theme.border};
+              border-radius: 12px;
+              padding: 16px;
+              background: ${theme.surfaceSecondary};
+              min-height: 140px;
+              font-size: 14px;
+              line-height: 1.6;
+              color: ${theme.text};
+              overflow-y: auto;
+              max-height: 200px;
+            ">
+              ${originalPrompt}
+            </div>
+          </div>
+          
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span style="font-size: 16px;">⭐</span>
+              <h3 style="margin: 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">Enhanced Prompt</h3>
+            </div>
+            <div style="
+              border: 1px solid ${theme.borderFocus};
+              border-radius: 12px;
+              padding: 16px;
+              background: ${theme.surfaceSecondary};
+              min-height: 140px;
+              font-size: 14px;
+              line-height: 1.6;
+              color: ${theme.text};
+              overflow-y: auto;
+              max-height: 200px;
+              position: relative;
+            ">
+              <div id="enhanced-text-transform"></div>
+            </div>
+          </div>
+        </div>
+
+        ${improvementsHtml}
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 1px solid ${theme.border};">
+          <button id="cancel-enhancement-transform" style="
+            padding: 12px 24px;
+            border: 1px solid ${theme.border};
+            border-radius: 12px;
+            background: ${theme.surface};
+            color: ${theme.textSecondary};
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+          ">
+            <span style='position: relative; z-index: 2; display: flex; align-items: center; gap: 6px;'>
+              <span style='font-size: 12px; transition: transform 0.2s ease;'>❌</span>
+              Cancel
+            </span>
+          </button>
+          <button id="accept-enhancement-transform" style="
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            background: ${theme.accent};
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+          ">
+            <span style='position: relative; z-index: 2; display: flex; align-items: center; gap: 8px;'>
+              <span style='font-size: 14px; transition: transform 0.2s ease;'>✨</span>
+              Use Enhanced Prompt
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // Start streaming animation
+  setTimeout(() => {
+    const enhancedTextElement = document.getElementById('enhanced-text-transform')
+    if (enhancedTextElement) {
+      typeWriterEffect(enhancedTextElement, enhancedPrompt, 25).then(() => {
+        console.log("✅ Streaming animation completed")
+      })
+    }
+  }, 300)
+  
+  // Add event listeners for new buttons
+  setupResultButtons(modal, theme)
+}
+
+function showErrorInModal(modal: HTMLElement, errorMessage: string) {
+  const theme = detectTheme()
+  console.log("❌ Showing error in modal:", errorMessage)
+  
+  modal.innerHTML = `
+    <div style="
+      background: ${theme.surface};
+      backdrop-filter: ${theme.blur};
+      border: 1px solid #ef4444;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 90vw;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: ${theme.shadow};
+      transition: all 0.3s ease;
+    ">
+      <div style="padding: 32px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+          ">❌</div>
+          <h2 style="margin: 0; color: ${theme.text}; font-size: 24px; font-weight: 700;">
+            Enhancement Failed
+          </h2>
+        </div>
+        
+        <p style="color: ${theme.textSecondary}; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+          ${errorMessage}
+        </p>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 1px solid ${theme.border};">
+          <button id="close-error-modal" style="
+            padding: 12px 24px;
+            border: 1px solid ${theme.border};
+            border-radius: 12px;
+            background: ${theme.surface};
+            color: ${theme.textSecondary};
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+          ">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // Add close button functionality
+  const closeButton = document.getElementById('close-error-modal')
+  if (closeButton) {
+    closeButton.addEventListener('click', () => {
+      modal.style.animation = 'fadeOut 0.2s ease-in forwards'
+      setTimeout(() => modal.remove(), 200)
+    })
+  }
+}
+
+function setupResultButtons(modal: HTMLElement, theme: Theme) {
+  const cancelButton = document.getElementById('cancel-enhancement-transform')
+  const acceptButton = document.getElementById('accept-enhancement-transform')
+  
+  if (cancelButton) {
+    cancelButton.addEventListener('mouseenter', () => {
+      cancelButton.style.background = theme.surfaceSecondary
+      cancelButton.style.color = theme.text
+      cancelButton.style.transform = 'translateY(-2px) scale(1.02)'
+      cancelButton.style.borderColor = theme.borderFocus
+    })
+    
+    cancelButton.addEventListener('mouseleave', () => {
+      cancelButton.style.background = theme.surface
+      cancelButton.style.color = theme.textSecondary
+      cancelButton.style.transform = 'translateY(0) scale(1)'
+      cancelButton.style.borderColor = theme.border
+    })
+    
+    cancelButton.addEventListener('click', () => {
+      modal.style.animation = 'fadeOut 0.2s ease-in forwards'
+      setTimeout(() => modal.remove(), 200)
+    })
+  }
+
+  if (acceptButton) {
+    acceptButton.addEventListener('mouseenter', () => {
+      acceptButton.style.background = theme.accentHover
+      acceptButton.style.transform = 'translateY(-2px) scale(1.05)'
+      acceptButton.style.boxShadow = '0 12px 24px rgba(102, 126, 234, 0.5)'
+    })
+    
+    acceptButton.addEventListener('mouseleave', () => {
+      acceptButton.style.background = theme.accent
+      acceptButton.style.transform = 'translateY(0) scale(1)'
+      acceptButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+    })
+    
+    acceptButton.addEventListener('click', () => {
+      // Find the original ChatGPT input and update it
+      const inputElement = findChatInput()
+      if (inputElement) {
+        setInputValue(inputElement, enhancedPrompt)
+        
+        // Success animation
+        acceptButton.innerHTML = '✅ Applied!'
+        acceptButton.style.background = '#10b981'
+        setTimeout(() => {
+          modal.style.animation = 'fadeOut 0.3s ease-in forwards'
+          setTimeout(() => modal.remove(), 300)
+        }, 800)
+      }
+    })
+  }
 }
 
 // Streaming text animation function
@@ -843,7 +1459,7 @@ function showEnhancementModal() {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-              <span style="font-size: 16px;">📝</span>
+              <span style="font-size: 16px;">✏️</span>
               <h3 style="margin: 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">Original Prompt</h3>
             </div>
             <div style="
@@ -864,7 +1480,7 @@ function showEnhancementModal() {
           
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-              <span style="font-size: 16px;">🚀</span>
+              <span style="font-size: 16px;">⭐</span>
               <h3 style="margin: 0; color: ${theme.textSecondary}; font-size: 16px; font-weight: 600;">Enhanced Prompt</h3>
             </div>
             <div id="enhanced-prompt-container" style="
