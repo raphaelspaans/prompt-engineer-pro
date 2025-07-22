@@ -1,15 +1,27 @@
 {
-  "name": "prompt-enhancer",
-  "displayName": "Prompt enhancer",
-  "version": "0.0.1",
-  "description": "Prompt Engineer Pro",
+  "name": "chatgpt-prompt-enhancer",
+  "displayName": "ChatGPT Prompt Enhancer",
+  "version": "1.0.0",
+  "description": "AI-powered browser extension that enhances your ChatGPT prompts for better clarity, specificity, and effectiveness",
   "author": "rspaans",
+  "keywords": ["chatgpt", "prompt", "ai", "enhancement", "openai", "browser-extension", "chrome-extension"],
+  "homepage": "https://github.com/rspaans/chatgpt-prompt-enhancer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rspaans/chatgpt-prompt-enhancer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rspaans/chatgpt-prompt-enhancer/issues"
+  },
+  "license": "MIT",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
     "package": "plasmo package"
   },
   "dependencies": {
+    "@plasmohq/messaging": "^0.7.2",
+    "@plasmohq/storage": "^1.15.0",
     "plasmo": "0.90.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -26,6 +38,10 @@
   "manifest": {
     "host_permissions": [
       "https://*/*"
+    ],
+    "permissions": [
+      "storage",
+      "activeTab"
     ]
   }
 }

@@ -1,33 +1,81 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
 
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Build outputs
+build/
+dist/
+.plasmo/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+.env.test
 
-# testing
-/coverage
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# misc
+# OS generated files
 .DS_Store
-*.pem
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# debug
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# local env files
-.env*.local
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-out/
-build/
-dist/
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
 
-# plasmo
-.plasmo
+# Dependency directories
+jspm_packages/
 
-# typescript
-.tsbuildinfo
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Temporary folders
+tmp/
+temp/
+
+# Extension specific
+web-ext-artifacts/
+*.zip
+*.crx
+*.pem
