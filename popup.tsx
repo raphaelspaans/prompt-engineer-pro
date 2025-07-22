@@ -3,19 +3,21 @@ import { useState, useEffect } from "react"
 function IndexPopup() {
   const [apiKey, setApiKey] = useState("")
   const [provider, setProvider] = useState("openai")
+  const [model, setModel] = useState("gpt-4o-mini")
   const [isSaved, setIsSaved] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    chrome.storage.sync.get(['apiKey', 'provider'], (result) => {
+    chrome.storage.sync.get(['apiKey', 'provider', 'model'], (result) => {
       if (result.apiKey) setApiKey(result.apiKey)
       if (result.provider) setProvider(result.provider)
+      if (result.model) setModel(result.model)
       setIsLoading(false)
     })
   }, [])
 
   const saveSettings = () => {
-    chrome.storage.sync.set({ apiKey, provider }, () => {
+    chrome.storage.sync.set({ apiKey, provider, model }, () => {
       setIsSaved(true)
       setTimeout(() => setIsSaved(false), 2000)
     })
@@ -25,6 +27,7 @@ function IndexPopup() {
     chrome.storage.sync.clear(() => {
       setApiKey("")
       setProvider("openai")
+      setModel("gpt-4o-mini")
       setIsSaved(false)
     })
   }
@@ -75,9 +78,45 @@ function IndexPopup() {
             backgroundColor: 'white'
           }}
         >
-          <option value="openai">OpenAI (GPT-4)</option>
-          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI</option>
         </select>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ 
+          display: 'block', 
+          marginBottom: 6, 
+          fontSize: 14, 
+          fontWeight: 600,
+          color: '#4a5568'
+        }}>
+          Model
+        </label>
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: 6,
+            fontSize: 14,
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="gpt-4o-mini">GPT-4o Mini (💰 Most Cost-Effective)</option>
+          <option value="gpt-4o">GPT-4o (⚡ Balanced Performance)</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo (🚀 High Performance)</option>
+          <option value="gpt-4">GPT-4 (🔬 Maximum Quality)</option>
+        </select>
+        <div style={{ 
+          fontSize: 12, 
+          color: '#718096', 
+          marginTop: 4,
+          lineHeight: 1.3
+        }}>
+          GPT-4o Mini is ~60x cheaper than GPT-4 and perfect for prompt enhancement
+        </div>
       </div>
 
       <div style={{ marginBottom: 20 }}>
@@ -94,7 +133,7 @@ function IndexPopup() {
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
+          placeholder="sk-..."
           style={{
             width: '100%',
             padding: '8px 12px',
@@ -110,10 +149,7 @@ function IndexPopup() {
           marginTop: 4,
           lineHeight: 1.3
         }}>
-          {provider === 'openai' 
-            ? 'Get your API key from platform.openai.com' 
-            : 'Get your API key from console.anthropic.com'
-          }
+          Get your API key from platform.openai.com
         </div>
       </div>
 

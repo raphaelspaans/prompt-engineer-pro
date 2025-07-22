@@ -62,10 +62,11 @@ async function handleEnhance(body: { prompt: string }): Promise<{ enhancedPrompt
   console.log("📝 Prompt to enhance:", prompt.substring(0, 100) + (prompt.length > 100 ? "..." : ""))
   console.log("🔧 Retrieving stored configuration...")
   
-  const { apiKey, provider } = await getStoredConfig()
+  const { apiKey, provider, model } = await getStoredConfig()
   console.log("⚙️ Config retrieved:", { 
     hasApiKey: !!apiKey, 
     provider,
+    model,
     apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + "..." : "none"
   })
   
@@ -78,8 +79,8 @@ async function handleEnhance(body: { prompt: string }): Promise<{ enhancedPrompt
   }
 
   if (provider === 'openai') {
-    console.log("🤖 Using OpenAI provider")
-    return enhanceWithOpenAI(prompt, apiKey)
+    console.log(`🤖 Using OpenAI provider with model: ${model}`)
+    return enhanceWithOpenAI(prompt, apiKey, model)
   } else {
     console.log("❌ Unsupported provider:", provider)
     return {
@@ -89,19 +90,20 @@ async function handleEnhance(body: { prompt: string }): Promise<{ enhancedPrompt
   }
 }
 
-async function getStoredConfig(): Promise<{ apiKey: string, provider: string }> {
+async function getStoredConfig(): Promise<{ apiKey: string, provider: string, model: string }> {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(['apiKey', 'provider'], (result) => {
+    chrome.storage.sync.get(['apiKey', 'provider', 'model'], (result) => {
       resolve({
         apiKey: result.apiKey || '',
-        provider: result.provider || 'openai'
+        provider: result.provider || 'openai',
+        model: result.model || 'gpt-4o-mini'
       })
     })
   })
 }
 
-async function enhanceWithOpenAI(prompt: string, apiKey: string): Promise<{ enhancedPrompt: string, improvements: string[] }> {
-  console.log("🚀 Starting OpenAI enhancement...")
+async function enhanceWithOpenAI(prompt: string, apiKey: string, model: string = 'gpt-4o-mini'): Promise<{ enhancedPrompt: string, improvements: string[] }> {
+  console.log(`🚀 Starting OpenAI enhancement with model: ${model}`)
   console.log("📊 API Key validation:", {
     hasKey: !!apiKey,
     keyLength: apiKey.length,
@@ -139,7 +141,7 @@ Do not include any text outside the JSON response.`
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
